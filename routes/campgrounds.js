@@ -1,13 +1,16 @@
+
 var Campground = require("../models/campground");
 var express = require("express");
 const router = express.Router();
-const auth = require("./auth")
+const auth = require("./auth");
+const checkCampgroundOwnership = auth.checkCampgroundOwnership;
 
 //INDEX - show all campgrounds
 router.get("/campgrounds", function (req, res) {
     // Get all campgrounds from DB
     Campground.find({}, function (err, allCampgrounds) {
         if (err) {
+            flash("error", err.message);
             console.log(err);
         }
         else {
@@ -22,17 +25,20 @@ router.post("/campgrounds", auth.isLoggedIn, function (req, res) {
     var name = req.body.name;
     var image = req.body.image;
     var desc = req.body.description;
+    var price = req.body.price
     var user = {
         id: req.user._id,
         username: req.user.username
     }
-    var newCampground = { name: name, image: image, description: desc, creator: user };
+    var newCampground = { name: name, image: image, description: desc, creator: user, price: price};
     // Create a new campground and save to DB
     Campground.create(newCampground, function (err, newlyCreated) {
         if (err) {
+            flash("error", err.message);
             console.log(err);
         }
         else {
+            flash("success", newlyCreated.name + " saved!");
             //redirect back to campgrounds page
             res.redirect("/campgrounds");
         }
@@ -48,6 +54,7 @@ router.get("/campgrounds/:id", function (req, res) {
     //find the campground with provided ID
     Campground.findById(req.params.id).populate("comments").exec(function (err, foundCampground) {
         if (err) {
+            flash("error", err.message);
             console.log(err);
         }
         else {
@@ -71,11 +78,10 @@ router.put("/campgrounds/:id", checkCampgroundOwnership, function(req, res) {
     Campground.findByIdAndUpdate(req.params.id, req.body.campground, function(err, updatedCampground){
         console.log(updatedCampground);
         if(err){
-            console.log("😀");
-            console.log(err);
-            console.log("😀");
+            flash("error", err.message);
             res.redirect("/campgrounds")
         }else {
+            flash("success", "Updated Campground!");
             res.redirect("/campgrounds/"+req.params.id);
         }
     });
@@ -86,29 +92,13 @@ router.delete("/campgrounds/:id", checkCampgroundOwnership, function(req, res){
     Campground.findByIdAndRemove( req.params.id, function(err){
         if(err){
             console.log(err)
+            flash("error", err.message);
             res.redirect("/campgrounds")
         }else {
+            flash("success", "Campground Deleted!")
             res.redirect("/campgrounds")
         }
     });
 });
-
-function checkCampgroundOwnership(req, res, next) {
-    if(req.isAuthenticated()){
-        Campground.findById(req.params.id, function(err, foundCampground){
-            if(err){
-                res.redirect("back");
-            }else {
-                if(foundCampground.creator.id.equals(req.user._id)){
-                    next();
-                } else {
-                    res.redirect("back");
-                }
-            }
-        });
-    } else {
-        res.redirect("back");
-    }
-}
 
 module.exports = router;
